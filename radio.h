@@ -9,7 +9,6 @@
  *    Engelke, Stefan.  AVR-Lib/nRF24L01.  http://www.tinkerer.eu/AVRLib/nRF24L01
  *    Nordic Semiconductor.  nRF24L01 Product Specification 2.0.  http://www.nordicsemi.no/files/Product/data_sheet/nRF24L01_Product_Specification_v2_0.pdf
  *
- *    Most of the hard work for this was done by [Engelke].
  */
 
 #ifndef RADIO_H_
@@ -19,7 +18,6 @@
 #include <string.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include "util/delay.h"
 #include "nRF24L01.h"
 #include "packet.h"
 #include "spi.h"

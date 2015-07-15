@@ -8,18 +8,11 @@
  */
 
 #include "spi.h"
-#include "util/delay.h"
+#include "../arduino/Arduino.h"
+//#include "util/delay.h"
 
-#include "spi.h"
 #include <avr/io.h>
 #include <avr/interrupt.h>
-
-#define SPI_DDR DDRB	// DDR of SPI port
-#define SPI_PORT PORTB	// SPI port
-#define SPI_MOSI PORTB2	// MOSI pin (Master out, Slave in)
-#define SPI_MISO PORTB3	// MISO pin (Master in, Slave out)
-#define SPI_SCK PORTB1	// SCK pin (SPI clock)
-#define SPI_SS PORTB0	// SS pin (Slave Select)
 
 // wait for an SPI read/write operation to complete
 #define SPI_WAIT()              while ((SPSR & _BV(SPIF)) == 0);
@@ -31,9 +24,10 @@ void SPI_Init()
 	// the SS pin that's used for a given slave.  Anything that uses this driver must handle its own slave selection.
 	// It must set its SS pin direction to output, set the pin low before doing an SPI operation, and set it high
 	// when the SPI operation is complete.
-    SPI_DDR &= ~(_BV(SPI_MOSI)|_BV(SPI_MISO)|_BV(SPI_SS)|_BV(SPI_SCK));
-    // Define the following pins as output
-    SPI_DDR |= (_BV(SPI_MOSI) | _BV(SPI_SS) | _BV(SPI_SCK));
+	pinMode(MOSI, OUTPUT);
+	pinMode(MISO, INPUT);
+	pinMode(SCK, OUTPUT);
+	pinMode(SS, OUTPUT);
 
 	/* SPCR format:
 	 *
@@ -48,14 +42,12 @@ void SPI_Init()
 	 * bit 0
 	 */
 
-    // Set the AT90's SS pin high during config (this disables the Flash RAM or something)
-    SPI_PORT |= _BV(SPI_SS);
+    // Set the AT90's SS pin high so that this board doesn't get set to slave mode.
+	digitalWrite(SS, HIGH);
 
 	SPCR = _BV(SPE) | _BV(MSTR);	// enable SPI, set as master, set prescaler to f(osc)/4
 
-	SPSR = _BV(SPI2X);							// Double SCK to f(osc)/2 (4 MHz)
-
-	SPI_PORT &= ~_BV(SPI_SS);
+	digitalWrite(SS, LOW);
 }
 
 void SPI_ReadWrite_Block(uint8_t* data, uint8_t* buffer, uint8_t len)

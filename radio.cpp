@@ -5,6 +5,7 @@
  *      Author: Neil MacMillan
  */
 #include "radio.h"
+#include "../arduino/Arduino.h"
 
 // non-public constants and macros
 
@@ -12,18 +13,14 @@
 #define ADDRESS_LENGTH 5
 
 // Pin definitions for chip select and chip enable on the radio module
-#define CE_DDR		DDRB
-#define CSN_DDR		DDRE
-#define CE_PORT		PORTB
-#define CSN_PORT	PORTE
-#define CE_PIN		PB4
-#define CSN_PIN		PE6
+#define CE_PIN 8
+#define CSN_PIN 9
 
 // Definitions for selecting and enabling the radio
-#define CSN_HIGH()	CSN_PORT |=  _BV(CSN_PIN);
-#define CSN_LOW()	CSN_PORT &= ~_BV(CSN_PIN);
-#define CE_HIGH()	CE_PORT |=  _BV(CE_PIN);
-#define CE_LOW()	CE_PORT &= ~_BV(CE_PIN);
+#define CSN_HIGH()	digitalWrite(CSN_PIN, HIGH);
+#define CSN_LOW()	digitalWrite(CSN_PIN, LOW);
+#define CE_HIGH()	digitalWrite(CE_PIN, HIGH);
+#define CE_LOW()	digitalWrite(CE_PIN, LOW);
 
 // Flag which denotes that the radio is currently transmitting
 static volatile uint8_t transmit_lock;
@@ -37,6 +34,8 @@ static volatile uint8_t rx_pipe0_address[5] = { 0xe7, 0xe7, 0xe7, 0xe7, 0xe7 };
 static volatile uint16_t tx_history = 0xFF;
 
 static volatile RADIO_TX_STATUS tx_last_status = RADIO_TX_SUCCESS;
+
+void int0handler();
 
 extern void radio_rxhandler(uint8_t pipenumber);
 
@@ -135,8 +134,8 @@ static void set_rx_mode()
 		config |= _BV(PRIM_RX);
 		set_register(CONFIG, &config, 1);
 		// the radio takes 130 us to power up the receiver.
-		_delay_us(65);
-		_delay_us(65);
+		delayMicroseconds(65);
+		delayMicroseconds(65);
 	}
 }
 
@@ -154,8 +153,8 @@ static void set_tx_mode()
 		// The radio takes 130 us to power up the transmitter
 		// You can delete this if you're sending large packets (I'm thinking > 25 bytes, but I'm not sure) because it
 		// sending the bytes over SPI can take this long.
-		_delay_us(65);
-		_delay_us(65);
+		delayMicroseconds(65);
+		delayMicroseconds(65);
 	}
 }
 
@@ -223,23 +222,20 @@ void Radio_Init()
 	CE_LOW();
 
 	// set as output AT90 pins connected to the radio's slave select and chip enable pins.
-	CE_DDR |= _BV(CE_PIN);
-	CSN_DDR |= _BV(CSN_PIN);
+	pinMode(CE_PIN, OUTPUT);
+	pinMode(CSN_PIN, OUTPUT);
 
 	// Enable radio interrupt.  This interrupt is triggered when data are received and when a transmission completes.
-	DDRE &= ~_BV(PORTE7);
-	EICRB |= _BV(ISC71);
-	EICRB &= ~_BV(ISC70);
-	EIMSK |= _BV(INT7);
+	attachInterrupt(0, int0handler, FALLING);
 
 	// A 10.3 ms delay is required between power off and power on states (controlled by 3.3 V supply).
-	_delay_ms(11);
+	delay(11);
 
 	// Configure the radio registers that are not application-dependent.
 	configure_registers();
 
 	// A 1.5 ms delay is required between power down and power up states (controlled by PWR_UP bit in CONFIG)
-	_delay_ms(2);
+	delay(2);
 
 	// enable radio as a receiver
 	CE_HIGH();
@@ -251,7 +247,7 @@ void Radio_Init()
 // default address for pipe 3 is 0xc2c2c2c2c4 (disabled)
 // default address for pipe 4 is 0xc2c2c2c2c5 (disabled)
 // default address for pipe 5 is 0xc2c2c2c2c6 (disabled)
-void Radio_Configure_Rx(RADIO_PIPE pipe, uint8_t* address, uint8_t enable)
+void Radio_Configure_Rx(RADIO_PIPE pipe, uint8_t* address, ON_OFF enable)
 {
 	uint8_t value;
 	uint8_t use_aa = 1;
@@ -348,7 +344,7 @@ uint8_t Radio_Transmit(radiopacket_t* payload, RADIO_TX_WAIT wait)
     set_register(RX_ADDR_P0, (uint8_t*)tx_address, ADDRESS_LENGTH);
 
     // transfer the packet to the radio's Tx FIFO for transmission
-    send_instruction(W_TX_PAYLOAD, payload, NULL, len);
+    send_instruction(W_TX_PAYLOAD, (uint8_t*)payload, NULL, len);
 
     // start the transmission.
     CE_HIGH();
@@ -414,7 +410,7 @@ RADIO_RX_STATUS Radio_Receive(radiopacket_t* buffer)
 }
 
 // This is only accurate if all the failed packets were sent using auto-ack.
-uint8_t Radio_Success_Rate()
+uint8_t Radio_Drop_Rate()
 {
 	uint16_t wh = tx_history;
 	uint8_t weight = 0;
@@ -435,7 +431,7 @@ void Radio_Flush()
 }
 
 // Interrupt handler
-ISR(INT7_vect)
+void int0handler()
 {
     uint8_t status;
     uint8_t pipe_number;
