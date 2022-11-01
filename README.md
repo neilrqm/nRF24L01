@@ -1,7 +1,7 @@
 # nRF24L01
 Driver code for nRF24L01 on 8-bit AVR microcontrollers.
 
-See http://nrqm.ca/nRF24L01 for more information.
+See https://nrqm.ca/nrqm.ca/nrf24l01/index.html for more information.
 
 The trunk code was written for Atmel's AT90USB1287 MCU, there is also Arduino code in the arduino branch.
 
